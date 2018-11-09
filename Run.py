@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from numpy.linalg import inv
+import math
+import matplotlib.pyplot as plt
 
 ''' Function declarations '''
 def standardize2( b ): #function for normalization. min-max method
@@ -15,8 +17,6 @@ def standardize2( b ): #function for normalization. min-max method
             a[i] = np.full( b[i].shape , 1 )
             i+=1
             continue
-        #mean = np.mean(b[i])
-        #var = np.std(b[i])**2
         a[i] = (b[i]-min)/range
         i+=1
     a = a.transpose()
@@ -28,8 +28,8 @@ def standardize( b ): #function for normalization. mean-variance method
     i = 0
     for x in b:
         mean = np.mean(b[i])
-        var = np.std(b[i])**2
-        a[i] = (b[i]-mean)/var
+        std = np.std(b[i])
+        a[i] = (b[i]-mean)/std
         i+=1
     a = a.transpose()
     return a
@@ -41,15 +41,48 @@ def error(X, Y, w): #error function calculator
     prediction = np.matmul(X,w)
     diff = prediction - Y
     Error = 0.5 * np.matmul(diff.transpose(), diff) / X.shape[0]
-    '''
-    while i < X.shape[0]:
-        x = X[i]
-        y = Y[i]
-        prediction = np.matmul( w.transpose() , x )
-        Error += 0.5 * (prediction - y)**2
+    return Error
+
+
+def ridgeRegression(X, Y, lam, X_cv, Y_cv):
+    w = np.random.rand(5,1)
+
+    #hard coded parameters
+    numOfIters = 100000
+    alpha = 0.01
+    #gradient decent
+    i = 0
+    while i<numOfIters:
+        #vectorized to run in one loop
+        grad = np.random.rand(5,1)
+        grad = np.matmul(X.transpose() , (np.matmul(X , w) - Y ) ) + 2*lam*w
+        grad = grad / x_train.shape[0]
+        w = w - alpha * grad
         i+=1
-    Error = Error/X.shape[0]
-    '''
+
+    wridge = w
+    Error = error(X_cv , Y_cv ,w)
+    return Error
+
+
+def lassoRegression(X, Y, lam, X_cv, Y_cv):
+    w = np.random.rand(5,1)
+
+    #hard coded parameters
+    numOfIters = 100000
+    alpha = 0.01
+    #gradient decent
+    i = 0
+    while i<numOfIters:
+        #vectorized to run in one loop
+        grad = np.random.rand(5,1)
+        grad = np.matmul(X.transpose() , (np.matmul(X , w) - Y ) ) + lam * np.divide(w, np.abs(w))
+        grad = grad / x_train.shape[0]
+        w = w - alpha * grad
+        i+=1
+
+    wlasso = w
+    Error = error(X_cv , Y_cv ,w)
     return Error
 
 def PartA(): #Part A of assignment.
@@ -73,18 +106,6 @@ def PartB(): #Part B of assignment
     #gradient decent
     i = 0
     while i<numOfIters:
-        #w_new = np.random.rand(w.shape[0],1) #intermnediate storage of new weights -- useless in vectorized implementation
-        '''
-        j=0
-        #loop over all the weight dimensions
-        while j < w.shape[0]:
-            grad = 0.0
-            grad = np.matmul( (np.matmul(x_train , w) - y_train ).transpose(), x_train .transpose()[j])
-            grad = grad/x_train .shape[0]
-            w_new[j][0] = w[j][0] - alpha * grad
-            j+=1
-        w = w_new
-        '''
         #vectorized to run in one loop
         grad = np.random.rand(5,1)
         grad = np.matmul(  x_train .transpose() , (np.matmul(x_train , w) - y_train ) )
@@ -95,6 +116,86 @@ def PartB(): #Part B of assignment
 
     print('The weight value is: \n' + str(w) )
     print('Error is: ' + str(error(x_test , y_test ,w)) )
+
+def PartC(): #Part C of the assignment
+    '''preprocess data again because of new cv data'''
+    data_np1 = standardize(data_np)
+
+    train_data = data_np1[:int(data_np.shape[0]*0.6)]
+    cv_data = data_np1[int(data_np.shape[0]*0.6)+1:int(data_np.shape[0]*0.8)]
+    test_data = data_np1[int(data_np.shape[0]*0.8)+1:]
+
+    x_train = train_data[:,:-1]
+    y_train = train_data[:,4]
+    y_train = np.reshape(y_train , (y_train.shape[0], 1))
+
+    x_cv = cv_data[:,:-1]
+    y_cv = cv_data[:,4]
+    y_cv = np.reshape(y_cv , (y_cv.shape[0], 1))
+
+    x_test = test_data[:,:-1]
+    y_test = test_data[:,4]
+    y_test = np.reshape(y_test , (y_test.shape[0], 1))
+
+    x_train = np.concatenate( ( np.full( (x_train .shape[0],1) , 1) ,x_train ) ,axis = 1)
+    x_cv = np.concatenate( ( np.full( (x_cv .shape[0],1), 1) ,x_cv ) ,axis = 1)
+    x_test = np.concatenate( ( np.full( (x_test .shape[0],1), 1) ,x_test ) ,axis = 1)
+
+    '''loop over all the lambda values'''
+    print('***** Ridge and lasso Regression ******')
+    loglambda = np.array([-5, -4, -3, -2, -1, 0, 1, 2])
+    ridgeErrors = np.zeros((loglambda.shape[0],1))
+    lassoErrors = np.zeros((loglambda.shape[0],1))
+    lam = 0.0
+    i=0
+    #iterate over all teh log lambda values to see which one is the best
+    for loglam in loglambda:
+        lam = math.pow(10, loglam)
+        #perform ridge regression
+        e = ridgeRegression(x_train, y_train, lam, x_cv, y_cv)
+        ridgeErrors[i][0] = e
+        #perform lasso regression
+        e = lassoRegression(x_train, y_train, lam, x_cv, y_cv)
+        lassoErrors[i][0] = e
+        i+=1
+
+
+    #plot graphs for each
+    plt.plot(loglambda, ridgeErrors, 'r--', label = 'ridge regression errors')#, lassoErrors, 'bs')
+    plt.plot(loglambda, lassoErrors, 'b--', label = 'lasso regression errors')
+    plt.legend()
+    plt.xlabel('log lambda')
+    plt.ylabel('cross-validation error')
+    plt.title('CV Errors with different lambda values')
+
+    #save the graph
+    plt.savefig('Errors_lambda.png', format = "png")
+
+    #get the best lambda and report test errors
+    i=0
+    minimum = float("inf")
+    optimumLambda = 0
+    while i<loglambda.shape[0]:
+        if ridgeErrors[i][0]<minimum:
+            minimum = ridgeErrors[i][0]
+            optimumLambda = math.pow(10, loglambda[i])
+        i+=1
+
+    print("The optimum value of lambda is: " + str(optimumLambda))
+    #perform ridge regression
+    e = ridgeRegression(x_train, y_train, lam, x_test, y_test)
+    print('The weight value is: \n' + str(wridge) )
+    print("The test error in ridge regression is: " +  str(e))
+    #perform lasso regression
+    e = lassoRegression(x_train, y_train, lam, x_test, y_test)
+    print('The weight value is: \n' + str(wlasso) )
+    print("The test error in lasso regression is: " +  str(e))
+
+
+    #show the graph in the end
+    plt.show()
+
+'''Run part'''
 
 
 ''' Data Pre-processing part '''
@@ -128,6 +229,11 @@ y_test  = standardize(y_test)
 x_train = np.concatenate( ( np.full( (x_train .shape[0],1) , 1) ,x_train ) ,axis = 1)
 x_test = np.concatenate( ( np.full( (x_test .shape[0],1), 1) ,x_test ) ,axis = 1)
 
+#weights results of ridge and lasso regression
+wridge = np.random.rand(5,1)
+wlasso = np.random.rand(5,1)
 
+#run all parts of the assignment
 PartA()
 PartB()
+PartC()
